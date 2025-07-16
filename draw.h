@@ -2,6 +2,7 @@
 #include"tigr.h"
 #include "math.h"
 #include <math.h>
+#include <vector>
 Tigr* screen;
 
 v2 world_to_screen(v2 p) {
@@ -13,12 +14,9 @@ v2 world_to_screen(v2 p) {
     return p;
 }
 
+
 TPixel color_white() { return tigrRGB(0xff, 0xff, 0xff); };
 TPixel color_black() { return tigrRGB(0, 0, 0); };
-TPixel color_red() { return tigrRGB(0xFF, 0, 0); };
-TPixel color_green() { return tigrRGB(0, 0xFF, 0); };
-TPixel color_blue() { return tigrRGB(0, 0, 0xFF); };
-
 void draw_circle(v2 a, float r, TPixel color) {
     a = world_to_screen(a);
     tigrCircle(screen, a.x, a.y, r, color);
@@ -50,6 +48,31 @@ void repelParticles(Particle& p) {
     }
 }
 
+void particleCollision(Particle& p1, Particle& p2) {
+    v2 distance_bw_particles = p1.position - p2.position;
+    float distance = sqrt(distance_bw_particles.x * distance_bw_particles.x + distance_bw_particles.y * distance_bw_particles.y);
+    if (distance < (p1.radius + p2.radius)) {
+        v2 normal = (p1.position - p2.position) / distance;
+        v2 relative_velocity = p1.velocity - p2.velocity;
+        float velocity_normal = dot(relative_velocity, normal);
+
+        if (velocity_normal > 0) return;
+        float e = 1.0f;
+        float j = -(1 + e) * velocity_normal / (1 / p1.mass + 1 / p2.mass);
+
+
+        v2 impulse = normal * j;
+        p1.velocity += impulse / p1.mass;
+        p2.velocity -= impulse / p2.mass;
+
+        float penetration = (p1.radius + p2.radius) - distance;
+        float percent = 0.8f;
+        v2 correction = normal * (penetration / (1 / p1.mass + 1 / p2.mass)) * percent;
+        p1.position += correction * (1 / p1.mass);
+        p2.position -= correction * (1 / p2.mass);
+    }
+}
+
 void update(Particle& p, float dt) {
     p.acceleration = v2(0, 0);
     p.acceleration = p.acceleration + v2(0, -100.0f);
@@ -61,7 +84,7 @@ void update(Particle& p, float dt) {
     float bottom_boundary = -240.0f + p.radius;
     float right_side_boundary = 320.0f - p.radius;
     float left_side_boundary = -320.0f + p.radius;
-    float top_boundary = 240.0f + p.radius;
+    float top_boundary = 240.0f - p.radius;
 
     if (p.position.y > top_boundary) {
         p.velocity.y = -p.velocity.y * 0.75f;
